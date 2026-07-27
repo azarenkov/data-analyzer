@@ -45,7 +45,7 @@ class PandasDataTable:
     @staticmethod
     def _normalize(frame: pd.DataFrame) -> pd.DataFrame:
         df = frame.copy()
-        df.columns = [str(c).strip() for c in df.columns]
+        df.columns = PandasDataTable._unique_names(str(c).strip() for c in df.columns)
         for column in df.columns:
             series = df[column]
             if not pd.api.types.is_string_dtype(series) and series.dtype != object:
@@ -57,6 +57,20 @@ class PandasDataTable:
             if parsed.notna().sum() / len(non_null) >= 0.9:
                 df[column] = pd.to_datetime(series, errors="coerce", format="mixed")
         return df
+
+    @staticmethod
+    def _unique_names(names) -> list[str]:
+        seen: set[str] = set()
+        result = []
+        for raw in names:
+            name = raw
+            suffix = 1
+            while name in seen:
+                suffix += 1
+                name = f"{raw}_{suffix}"
+            seen.add(name)
+            result.append(name)
+        return result
 
     def row_count(self) -> int:
         return int(len(self._df))
@@ -288,7 +302,9 @@ class PandasDataTable:
     def _filter_mask(self, series: pd.Series, spec: FilterSpec) -> pd.Series:
         op = spec.operator
         if op == FilterOperator.CONTAINS:
-            return series.astype(str).str.contains(str(spec.value), case=False, na=False)
+            return series.astype(str).str.contains(
+                str(spec.value), case=False, na=False, regex=False
+            )
         if op == FilterOperator.IN:
             values = spec.value if isinstance(spec.value, list) else [spec.value]
             return series.astype(str).isin([str(v) for v in values])
