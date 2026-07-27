@@ -57,12 +57,15 @@ export function DataTab({ datasetId, columns }: { datasetId: string; columns: Co
     const value =
       effectiveOperator === "in"
         ? raw.split(",").map((part) => part.trim()).filter(Boolean)
-        : draftKind === "numeric"
-          ? Number(raw)
-          : draftKind === "boolean"
-            ? raw === "true"
-            : raw.trim();
-    if (draftKind === "numeric" && effectiveOperator !== "in" && Number.isNaN(value)) return;
+        : draftKind === "boolean"
+          ? raw === "true"
+          : raw.trim();
+    if (
+      draftKind === "numeric" &&
+      effectiveOperator !== "in" &&
+      Number.isNaN(Number(raw.trim()))
+    )
+      return;
     setFilters((current) => [
       ...current,
       { column: draftColumn, operator: effectiveOperator, value },

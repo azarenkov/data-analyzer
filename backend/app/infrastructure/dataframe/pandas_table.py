@@ -1,4 +1,5 @@
 import io
+import json
 import math
 
 import numpy as np
@@ -64,6 +65,13 @@ class PandasDataTable:
             series = df[column]
             if not pd.api.types.is_string_dtype(series) and series.dtype != object:
                 continue
+            if series.map(lambda v: isinstance(v, (list, dict))).any():
+                series = series.map(
+                    lambda v: json.dumps(v, ensure_ascii=False)
+                    if isinstance(v, (list, dict))
+                    else v
+                )
+                df[column] = series
             non_null = series.dropna()
             if non_null.empty:
                 continue
@@ -143,7 +151,10 @@ class PandasDataTable:
             series = self._df[column]
             if not pd.api.types.is_numeric_dtype(series) or pd.api.types.is_bool_dtype(series):
                 continue
-            described = series.describe()
+            values = series.dropna()
+            if pd.api.types.is_float_dtype(values):
+                values = values[np.isfinite(values)]
+            described = values.describe()
             result.append(
                 NumericSummary(
                     column=column,
@@ -383,6 +394,12 @@ class PandasDataTable:
                 if text in ("false", "0", "нет", "no"):
                     return False
                 raise InvalidQueryError(f"Invalid boolean filter value '{value}'")
+            if pd.api.types.is_integer_dtype(series):
+                text = str(value).strip()
+                try:
+                    return int(text)
+                except ValueError:
+                    return float(text)
             if pd.api.types.is_numeric_dtype(series):
                 return float(value)
             if pd.api.types.is_datetime64_any_dtype(series):
@@ -413,9 +430,16 @@ class PandasDataTable:
             series = converted[column]
             if pd.api.types.is_datetime64_any_dtype(series):
                 non_null = series.dropna()
-                date_only = non_null.empty or (non_null.dt.time == pd.Timestamp(0).time()).all()
-                fmt = "%Y-%m-%d" if date_only else "%Y-%m-%d %H:%M:%S"
-                converted[column] = series.dt.strftime(fmt)
+                naive = not isinstance(series.dtype, pd.DatetimeTZDtype)
+                date_only = naive and (
+                    non_null.empty or (non_null.dt.time == pd.Timestamp(0).time()).all()
+                )
+                if date_only:
+                    converted[column] = series.dt.strftime("%Y-%m-%d")
+                else:
+                    converted[column] = series.map(
+                        lambda ts: ts.isoformat() if pd.notna(ts) else None
+                    )
         for column in converted.columns:
             series = converted[column]
             if pd.api.types.is_float_dtype(series):

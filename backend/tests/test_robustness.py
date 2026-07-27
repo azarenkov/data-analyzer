@@ -80,8 +80,8 @@ def test_summary_with_infinite_values(client):
     response = client.get(f"/api/datasets/{meta['id']}/summary")
     assert response.status_code == 200
     ratio = next(s for s in response.json() if s["column"] == "ratio")
-    assert ratio["maximum"] is None
-    assert ratio["minimum"] is None
+    assert ratio["maximum"] == 2.5
+    assert ratio["minimum"] == 2.5
 
 
 def test_top_excludes_non_finite_values(client):
@@ -113,3 +113,50 @@ def test_upload_size_limit(client, monkeypatch):
         files={"file": ("big.csv", b"a,b\n" + b"1,2\n" * 100, "text/csv")},
     )
     assert response.status_code == 413
+
+
+def test_json_upload_with_nested_values(client):
+    payload = b'[{"name": "alpha", "meta": {"tags": ["a", "b"]}}, {"name": "beta", "meta": {"tags": []}}]'
+    response = client.post(
+        "/api/datasets",
+        files={"file": ("nested.json", payload, "application/json")},
+    )
+    assert response.status_code == 200
+    dataset_id = response.json()["id"]
+    overview = client.get(f"/api/datasets/{dataset_id}")
+    assert overview.status_code == 200
+    page = client.post(f"/api/datasets/{dataset_id}/query", json={})
+    assert page.status_code == 200
+    assert "tags" in page.json()["rows"][0]["meta"]
+
+
+def test_large_integer_filter_is_exact(client):
+    meta = _upload_csv(client, b"id,name\n9007199254740993,alpha\n9007199254740992,beta\n")
+    page = client.post(
+        f"/api/datasets/{meta['id']}/query",
+        json={"filters": [{"column": "id", "operator": "eq", "value": "9007199254740993"}]},
+    )
+    assert page.status_code == 200
+    assert [row["name"] for row in page.json()["rows"]] == ["alpha"]
+
+
+def test_timestamps_keep_precision_and_offset(client):
+    meta = _upload_csv(
+        client,
+        b"ts,value\n2025-01-01T10:00:00.123Z,1\n2025-01-01T10:00:00.456Z,2\n",
+    )
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={})
+    assert page.status_code == 200
+    values = [row["ts"] for row in page.json()["rows"]]
+    assert values[0] != values[1]
+    assert "+00:00" in values[0]
+    assert ".123" in values[0]
+
+
+def test_summary_ignores_non_finite_observations(client):
+    meta = _upload_csv(client, b"name,ratio\nalpha,inf\nbeta,2.5\ngamma,-inf\n")
+    response = client.get(f"/api/datasets/{meta['id']}/summary")
+    ratio = next(s for s in response.json() if s["column"] == "ratio")
+    assert ratio["count"] == 1
+    assert ratio["mean"] == 2.5
+    assert ratio["maximum"] == 2.5
