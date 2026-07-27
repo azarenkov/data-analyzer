@@ -414,3 +414,13 @@ def test_aggregation_without_metric_is_rejected(client):
         params={"dateColumn": "day", "aggregation": "mean", "frequency": "day"},
     )
     assert series.status_code == 400
+
+
+def test_leading_zero_codes_stay_text(client):
+    meta = _upload_csv(client, b"zip,qty\n00123,1\n00456,2\n77000,3\n")
+    overview = client.get(f"/api/datasets/{meta['id']}").json()
+    kinds = {c["name"]: c["kind"] for c in overview["columns"]}
+    assert kinds["zip"] != "numeric"
+    assert kinds["qty"] == "numeric"
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    assert [row["zip"] for row in page["rows"]] == ["00123", "00456", "77000"]

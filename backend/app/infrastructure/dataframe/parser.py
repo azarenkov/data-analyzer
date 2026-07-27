@@ -45,6 +45,8 @@ class PandasDatasetParser:
         non_null = series.dropna()
         if non_null.empty:
             return series
+        if series.str.strip().str.fullmatch(r"[+-]?0\d+").dropna().any():
+            return series
         try:
             return series.astype("Int64")
         except (ValueError, TypeError, OverflowError):
