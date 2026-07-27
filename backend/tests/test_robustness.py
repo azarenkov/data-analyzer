@@ -321,3 +321,16 @@ def test_halves_split_uses_time_range_midpoint():
     assert len(changes) == 1
     assert changes[0].first == 3.0
     assert changes[0].second == 100.5
+
+
+def test_whitespace_only_header_gets_generated_name(client):
+    meta = _upload_csv(client, b" ,b\n1,2\n3,4\n")
+    overview = client.get(f"/api/datasets/{meta['id']}").json()
+    names = [c["name"] for c in overview["columns"]]
+    assert names == ["column", "b"]
+    page = client.post(
+        f"/api/datasets/{meta['id']}/query",
+        json={"filters": [{"column": "column", "operator": "eq", "value": "1"}]},
+    )
+    assert page.status_code == 200
+    assert len(page.json()["rows"]) == 1

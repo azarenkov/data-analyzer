@@ -130,11 +130,12 @@ class PandasDataTable:
         seen: set[str] = set()
         result = []
         for raw in names:
-            name = raw
+            base = raw or "column"
+            name = base
             suffix = 1
             while name in seen:
                 suffix += 1
-                name = f"{raw}_{suffix}"
+                name = f"{base}_{suffix}"
             seen.add(name)
             result.append(name)
         return result
