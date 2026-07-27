@@ -1,3 +1,4 @@
+from app.domain.dataset.errors import InvalidQueryError
 from app.domain.dataset.repository import DatasetRepository
 from app.domain.dataset.results import TimePoint
 from app.domain.dataset.values import Aggregation, FilterSpec, TimeFrequency
@@ -16,6 +17,10 @@ class GetTimeSeries:
         frequency: TimeFrequency,
         filters: list[FilterSpec],
     ) -> list[TimePoint]:
+        if metric is None and aggregation != Aggregation.COUNT:
+            raise InvalidQueryError(
+                f"Aggregation '{aggregation.value}' requires a metric; use 'count' for row counts"
+            )
         dataset = self._repository.get(dataset_id)
         return dataset.table.time_series(
             date_column=date_column,

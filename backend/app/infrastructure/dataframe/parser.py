@@ -45,11 +45,16 @@ class PandasDatasetParser:
         non_null = series.dropna()
         if non_null.empty:
             return series
-        for dtype in ("Int64", "Float64"):
-            try:
-                return series.astype(dtype)
-            except (ValueError, TypeError):
-                continue
+        try:
+            return series.astype("Int64")
+        except (ValueError, TypeError, OverflowError):
+            pass
+        if series.str.strip().str.fullmatch(r"[+-]?\d+").dropna().all():
+            return series
+        try:
+            return series.astype("Float64")
+        except (ValueError, TypeError, OverflowError):
+            pass
         lowered = series.str.strip().str.lower()
         if lowered.dropna().isin(("true", "false")).all():
             return lowered.map({"true": True, "false": False}).astype("boolean")

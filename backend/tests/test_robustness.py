@@ -390,3 +390,27 @@ def test_nullable_integer_column_keeps_large_ids_exact(client):
     assert values["alpha"] == "9007199254740993"
     assert values["beta"] is None
     assert values["gamma"] == 7
+
+
+def test_integers_beyond_int64_stay_text(client):
+    meta = _upload_csv(client, b"id,name\n9223372036854775809,alpha\n12,beta\n")
+    overview = client.get(f"/api/datasets/{meta['id']}").json()
+    kinds = {c["name"]: c["kind"] for c in overview["columns"]}
+    assert kinds["id"] != "numeric"
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    values = {row["name"]: row["id"] for row in page["rows"]}
+    assert values["alpha"] == "9223372036854775809"
+
+
+def test_aggregation_without_metric_is_rejected(client):
+    meta = _upload_csv(client, b"day,city\n2025-01-01,Astana\n2025-01-02,Almaty\n")
+    groups = client.get(
+        f"/api/datasets/{meta['id']}/group-by",
+        params={"by": "city", "aggregation": "sum"},
+    )
+    assert groups.status_code == 400
+    series = client.get(
+        f"/api/datasets/{meta['id']}/time-series",
+        params={"dateColumn": "day", "aggregation": "mean", "frequency": "day"},
+    )
+    assert series.status_code == 400
