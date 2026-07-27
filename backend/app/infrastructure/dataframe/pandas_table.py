@@ -32,6 +32,15 @@ _FREQ_MAP = {
     TimeFrequency.QUARTER: "QS",
 }
 
+def _finite_mask(series: pd.Series) -> pd.Series:
+    mask = series.notna()
+    if pd.api.types.is_float_dtype(series):
+        mask = mask & series.ne(np.inf) & series.ne(-np.inf)
+    if mask.isna().any():
+        mask = mask.fillna(False)
+    return mask.astype(bool)
+
+
 def _sum_with_min_count(series: pd.Series) -> float:
     return series.sum(min_count=1)
 
@@ -64,7 +73,7 @@ def excel_safe_frame(df: pd.DataFrame) -> pd.DataFrame:
         if isinstance(series.dtype, pd.DatetimeTZDtype):
             out[column] = series.dt.tz_convert("UTC").dt.tz_localize(None)
         elif pd.api.types.is_integer_dtype(series):
-            out[column] = series.map(
+            out[column] = series.astype(object).map(
                 lambda v: str(v) if pd.notna(v) and abs(int(v)) > _EXCEL_SAFE_INT else v
             )
         elif series.dtype == object:
@@ -202,9 +211,7 @@ class PandasDataTable:
             series = self._df[column]
             if not pd.api.types.is_numeric_dtype(series) or pd.api.types.is_bool_dtype(series):
                 continue
-            values = series.dropna()
-            if pd.api.types.is_float_dtype(values):
-                values = values[np.isfinite(values)]
+            values = series[_finite_mask(series)]
             described = values.describe()
             result.append(
                 NumericSummary(
@@ -230,7 +237,7 @@ class PandasDataTable:
     ) -> TablePage:
         self._require_numeric(metric)
         df = self._apply_filters(self._df, filters)
-        df = df[np.isfinite(df[metric])]
+        df = df[_finite_mask(df[metric])]
         df = df.sort_values(metric, ascending=ascending).head(limit)
         return TablePage(rows=self._records(df), total=int(len(df)), page=1, page_size=limit)
 
@@ -306,7 +313,7 @@ class PandasDataTable:
         self._require_datetime(date_column)
         self._require_numeric(metric)
         df = self._df.dropna(subset=[date_column, metric])
-        df = df[np.isfinite(df[metric])]
+        df = df[_finite_mask(df[metric])]
         if len(df) < 6:
             return []
         start = df[date_column].min()
@@ -398,7 +405,10 @@ class PandasDataTable:
         for spec in filters:
             self._require_column(spec.column, df)
             series = df[spec.column]
-            df = df[self._filter_mask(series, spec)]
+            mask = pd.Series(self._filter_mask(series, spec), index=df.index)
+            if mask.isna().any():
+                mask = mask.fillna(False)
+            df = df[mask.astype(bool)]
         return df
 
     def _filter_mask(self, series: pd.Series, spec: FilterSpec) -> pd.Series:
@@ -496,9 +506,9 @@ class PandasDataTable:
         for column in converted.columns:
             series = converted[column]
             if pd.api.types.is_float_dtype(series):
-                converted[column] = series.mask(~np.isfinite(series))
+                converted[column] = series.where(_finite_mask(series))
             elif pd.api.types.is_integer_dtype(series):
-                converted[column] = series.map(
+                converted[column] = series.astype(object).map(
                     lambda v: str(v) if pd.notna(v) and abs(int(v)) > _JS_SAFE_INT else v
                 )
             elif series.dtype == object:

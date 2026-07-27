@@ -378,3 +378,15 @@ def test_count_analytics_without_numeric_columns(client):
     )
     assert series.status_code == 200
     assert sum(p["value"] for p in series.json()) == 3.0
+
+
+def test_nullable_integer_column_keeps_large_ids_exact(client):
+    meta = _upload_csv(client, b"id,name\n9007199254740993,alpha\n,beta\n7,gamma\n")
+    overview = client.get(f"/api/datasets/{meta['id']}").json()
+    kinds = {c["name"]: c["kind"] for c in overview["columns"]}
+    assert kinds["id"] == "numeric"
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    values = {row["name"]: row["id"] for row in page["rows"]}
+    assert values["alpha"] == "9007199254740993"
+    assert values["beta"] is None
+    assert values["gamma"] == 7
