@@ -245,3 +245,43 @@ def test_sorting_mixed_type_column(client):
     )
     assert page.status_code == 200
     assert len(page.json()["rows"]) == 3
+
+
+def test_xlsx_export_keeps_large_integers_exact(client):
+    import io
+
+    meta = _upload_csv(client, b"id,name\n9007199254740993,alpha\n5,beta\n")
+    response = client.post(
+        f"/api/datasets/{meta['id']}/export",
+        json={"format": "xlsx"},
+    )
+    assert response.status_code == 200
+    frame = pd.read_excel(io.BytesIO(response.content), dtype={"id": str})
+    assert "9007199254740993" in set(frame["id"])
+
+
+def test_weekly_buckets_start_on_monday(client):
+    meta = _upload_csv(
+        client,
+        b"day,value\n2025-01-06,1\n2025-01-07,2\n2025-01-12,3\n2025-01-13,4\n",
+    )
+    response = client.get(
+        f"/api/datasets/{meta['id']}/time-series",
+        params={"dateColumn": "day", "metric": "value", "aggregation": "sum", "frequency": "week"},
+    )
+    assert response.status_code == 200
+    points = {p["period"]: p["value"] for p in response.json()}
+    assert points == {"2025-01-06": 6.0, "2025-01-13": 4.0}
+
+
+def test_correlations_survive_infinite_values():
+    frame = pd.DataFrame(
+        {
+            "a": [1.0, 2.0, 3.0, 4.0, float("inf")],
+            "b": [2.0, 4.0, 6.0, 8.0, 10.0],
+        }
+    )
+    table = PandasDataTable(frame)
+    pairs = table.correlation_pairs(limit=1)
+    assert pairs
+    assert abs(pairs[0].value - 1.0) < 1e-9

@@ -27,7 +27,7 @@ from app.domain.dataset.values import (
 
 _FREQ_MAP = {
     TimeFrequency.DAY: "D",
-    TimeFrequency.WEEK: "W-MON",
+    TimeFrequency.WEEK: "W-SUN",
     TimeFrequency.MONTH: "MS",
     TimeFrequency.QUARTER: "QS",
 }
@@ -45,6 +45,8 @@ _AGG_MAP = {
 }
 
 _JS_SAFE_INT = 9_007_199_254_740_991
+
+_EXCEL_SAFE_INT = 999_999_999_999_999
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
@@ -255,6 +257,8 @@ class PandasDataTable:
         for period, value in values.items():
             if pd.isna(value) or not math.isfinite(float(value)):
                 continue
+            if frequency == TimeFrequency.WEEK:
+                period = period - pd.Timedelta(days=6)
             result.append(TimePoint(period=self._period_label(period, frequency), value=float(value)))
         return result
 
@@ -314,7 +318,7 @@ class PandasDataTable:
         numeric = self._df.select_dtypes(include="number")
         if len(numeric.columns) < 2:
             return []
-        matrix = numeric.corr()
+        matrix = numeric.replace([np.inf, -np.inf], np.nan).corr()
         pairs = []
         cols = list(matrix.columns)
         for i, left in enumerate(cols):
@@ -351,6 +355,16 @@ class PandasDataTable:
             series = out[column]
             if isinstance(series.dtype, pd.DatetimeTZDtype):
                 out[column] = series.dt.tz_convert("UTC").dt.tz_localize(None)
+            elif pd.api.types.is_integer_dtype(series):
+                out[column] = series.map(
+                    lambda v: str(v) if pd.notna(v) and abs(int(v)) > _EXCEL_SAFE_INT else v
+                )
+            elif series.dtype == object:
+                out[column] = series.map(
+                    lambda v: str(v)
+                    if isinstance(v, int) and not isinstance(v, bool) and abs(v) > _EXCEL_SAFE_INT
+                    else v
+                )
         return out
 
     @staticmethod
