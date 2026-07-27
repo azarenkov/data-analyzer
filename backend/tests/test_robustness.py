@@ -217,3 +217,31 @@ def test_halves_change_ignores_non_finite_values():
     changes = table.halves_change("day", "metric", by=None)
     assert len(changes) == 1
     assert changes[0].change_pct is not None
+
+
+def test_mixed_column_stringifies_unsafe_integers(client):
+    payload = b'[{"id": 9007199254740993, "tag": "x"}, {"id": "manual", "tag": "y"}]'
+    response = client.post(
+        "/api/datasets",
+        files={"file": ("mixed.json", payload, "application/json")},
+    )
+    assert response.status_code == 200
+    page = client.post(f"/api/datasets/{response.json()['id']}/query", json={})
+    values = {row["tag"]: row["id"] for row in page.json()["rows"]}
+    assert values["x"] == "9007199254740993"
+    assert values["y"] == "manual"
+
+
+def test_sorting_mixed_type_column(client):
+    payload = b'[{"v": 10, "n": "a"}, {"v": "text", "n": "b"}, {"v": 2, "n": "c"}]'
+    response = client.post(
+        "/api/datasets",
+        files={"file": ("mixedsort.json", payload, "application/json")},
+    )
+    assert response.status_code == 200
+    page = client.post(
+        f"/api/datasets/{response.json()['id']}/query",
+        json={"sort": [{"column": "v", "descending": False}]},
+    )
+    assert page.status_code == 200
+    assert len(page.json()["rows"]) == 3

@@ -445,6 +445,7 @@ class PandasDataTable:
         return df.sort_values(
             [s.column for s in sort],
             ascending=[not s.descending for s in sort],
+            key=lambda s: s.map(str, na_action="ignore") if s.dtype == object else s,
         )
 
     def _records(self, df: pd.DataFrame) -> list[dict]:
@@ -470,6 +471,12 @@ class PandasDataTable:
             elif pd.api.types.is_integer_dtype(series):
                 converted[column] = series.map(
                     lambda v: str(v) if pd.notna(v) and abs(int(v)) > _JS_SAFE_INT else v
+                )
+            elif series.dtype == object:
+                converted[column] = series.map(
+                    lambda v: str(v)
+                    if isinstance(v, int) and not isinstance(v, bool) and abs(v) > _JS_SAFE_INT
+                    else v
                 )
         converted = converted.astype(object).where(pd.notna(converted), None)
         return converted.to_dict(orient="records")
