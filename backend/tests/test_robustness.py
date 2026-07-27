@@ -292,3 +292,32 @@ def test_xlsx_export_rejects_too_many_columns():
     table = PandasDataTable(frame)
     with pytest.raises(InvalidQueryError):
         table.export(filters=[], sort=[], fmt=ExportFormat.XLSX)
+
+
+def test_report_keeps_16_digit_integers_exact(client):
+    import io
+
+    meta = _upload_csv(client, b"account,name\n1234567890123456,alpha\n7,beta\n")
+    response = client.get(f"/api/datasets/{meta['id']}/report")
+    assert response.status_code == 200
+    frame = pd.read_excel(
+        io.BytesIO(response.content), sheet_name="Данные", dtype={"account": str}
+    )
+    assert "1234567890123456" in set(frame["account"])
+
+
+def test_halves_split_uses_time_range_midpoint():
+    frame = pd.DataFrame(
+        {
+            "day": pd.to_datetime(
+                ["2025-01-01", "2025-01-02", "2025-01-03", "2025-01-04", "2025-01-05",
+                 "2025-12-30", "2025-12-31"]
+            ),
+            "metric": [1.0, 2.0, 3.0, 4.0, 5.0, 100.0, 101.0],
+        }
+    )
+    table = PandasDataTable(frame)
+    changes = table.halves_change("day", "metric", by=None)
+    assert len(changes) == 1
+    assert changes[0].first == 3.0
+    assert changes[0].second == 100.5

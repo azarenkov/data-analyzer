@@ -55,6 +55,25 @@ _EXCEL_MAX_ROWS = 1_048_575
 _EXCEL_MAX_COLS = 16_384
 
 
+def excel_safe_frame(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    for column in out.columns:
+        series = out[column]
+        if isinstance(series.dtype, pd.DatetimeTZDtype):
+            out[column] = series.dt.tz_convert("UTC").dt.tz_localize(None)
+        elif pd.api.types.is_integer_dtype(series):
+            out[column] = series.map(
+                lambda v: str(v) if pd.notna(v) and abs(int(v)) > _EXCEL_SAFE_INT else v
+            )
+        elif series.dtype == object:
+            out[column] = series.map(
+                lambda v: str(v)
+                if isinstance(v, int) and not isinstance(v, bool) and abs(v) > _EXCEL_SAFE_INT
+                else v
+            )
+    return out
+
+
 def safe_excel_writer(buffer: io.BytesIO) -> pd.ExcelWriter:
     return pd.ExcelWriter(
         buffer,
@@ -284,7 +303,9 @@ class PandasDataTable:
         df = df[np.isfinite(df[metric])]
         if len(df) < 6:
             return []
-        midpoint = df[date_column].median()
+        start = df[date_column].min()
+        end = df[date_column].max()
+        midpoint = start + (end - start) / 2
         first_half = df[df[date_column] <= midpoint]
         second_half = df[df[date_column] > midpoint]
         if first_half.empty or second_half.empty:
@@ -351,27 +372,8 @@ class PandasDataTable:
             )
         buffer = io.BytesIO()
         with safe_excel_writer(buffer) as writer:
-            self._excel_safe(df).to_excel(writer, index=False, sheet_name="Data")
+            excel_safe_frame(df).to_excel(writer, index=False, sheet_name="Data")
         return buffer.getvalue()
-
-    @staticmethod
-    def _excel_safe(df: pd.DataFrame) -> pd.DataFrame:
-        out = df.copy()
-        for column in out.columns:
-            series = out[column]
-            if isinstance(series.dtype, pd.DatetimeTZDtype):
-                out[column] = series.dt.tz_convert("UTC").dt.tz_localize(None)
-            elif pd.api.types.is_integer_dtype(series):
-                out[column] = series.map(
-                    lambda v: str(v) if pd.notna(v) and abs(int(v)) > _EXCEL_SAFE_INT else v
-                )
-            elif series.dtype == object:
-                out[column] = series.map(
-                    lambda v: str(v)
-                    if isinstance(v, int) and not isinstance(v, bool) and abs(v) > _EXCEL_SAFE_INT
-                    else v
-                )
-        return out
 
     @staticmethod
     def _escape_csv_formulas(df: pd.DataFrame) -> pd.DataFrame:
