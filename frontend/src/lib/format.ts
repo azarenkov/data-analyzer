@@ -1,5 +1,7 @@
-export function formatNumber(value: number | null | undefined, digits = 2): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+export function formatNumber(value: number | string | null | undefined, digits = 2): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value;
+  if (Number.isNaN(value)) return "—";
   if (Number.isInteger(value) && Math.abs(value) < 1_000_000) {
     return value.toLocaleString("ru-RU");
   }

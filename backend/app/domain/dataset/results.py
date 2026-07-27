@@ -17,11 +17,11 @@ class NumericSummary:
     count: int
     mean: float | None
     std: float | None
-    minimum: float | None
+    minimum: float | int | str | None
     p25: float | None
     median: float | None
     p75: float | None
-    maximum: float | None
+    maximum: float | int | str | None
 
 
 @dataclass(frozen=True)

@@ -519,3 +519,12 @@ def test_xlsx_export_rejects_overlong_cells(client):
     assert csv_export.status_code == 200
     report = client.get(f"/api/datasets/{meta['id']}/report")
     assert report.status_code == 400
+
+
+def test_summary_keeps_large_integer_extrema_exact(client):
+    meta = _upload_csv(client, b"id,name\n9007199254740993,alpha\n5,beta\n")
+    response = client.get(f"/api/datasets/{meta['id']}/summary")
+    assert response.status_code == 200
+    summary = next(s for s in response.json() if s["column"] == "id")
+    assert summary["maximum"] == "9007199254740993"
+    assert summary["minimum"] == 5

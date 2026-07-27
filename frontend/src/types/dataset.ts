@@ -55,11 +55,11 @@ export interface NumericSummary {
   count: number;
   mean: number | null;
   std: number | null;
-  minimum: number | null;
+  minimum: number | string | null;
   p25: number | null;
   median: number | null;
   p75: number | null;
-  maximum: number | null;
+  maximum: number | string | null;
 }
 
 export interface GroupRow {

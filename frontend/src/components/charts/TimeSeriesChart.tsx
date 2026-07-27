@@ -13,7 +13,7 @@ import { formatNumber } from "../../lib/format";
 import type { TimePoint } from "../../types/dataset";
 
 export function TimeSeriesChart({ data: raw, valueLabel }: { data: TimePoint[]; valueLabel: string }) {
-  const data = raw.map((point) => ({ ...point, value: Number(point.value) }));
+  const data = raw.map((point) => ({ ...point, plotValue: Number(point.value) }));
   return (
     <ResponsiveContainer width="100%" height={300}>
       <AreaChart data={data} margin={{ top: 8, right: 24, bottom: 4, left: 8 }}>
@@ -44,7 +44,7 @@ export function TimeSeriesChart({ data: raw, valueLabel }: { data: TimePoint[]; 
         />
         <Area
           type="monotone"
-          dataKey="value"
+          dataKey="plotValue"
           stroke={chart.series1}
           strokeWidth={2}
           fill="url(#tsFill)"

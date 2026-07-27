@@ -79,11 +79,11 @@ class NumericSummarySchema(ApiModel):
     count: int
     mean: float | None
     std: float | None
-    minimum: float | None
+    minimum: int | float | str | None
     p25: float | None
     median: float | None
     p75: float | None
-    maximum: float | None
+    maximum: int | float | str | None
 
 
 class GroupRowSchema(ApiModel):

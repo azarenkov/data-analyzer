@@ -13,7 +13,7 @@ import { formatNumber } from "../../lib/format";
 import type { GroupRow } from "../../types/dataset";
 
 export function GroupBarChart({ data: raw, valueLabel }: { data: GroupRow[]; valueLabel: string }) {
-  const data = raw.map((row) => ({ ...row, value: Number(row.value) }));
+  const data = raw.map((row) => ({ ...row, plotValue: Number(row.value) }));
   const height = Math.max(220, Math.min(560, data.length * 34 + 40));
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -39,7 +39,7 @@ export function GroupBarChart({ data: raw, valueLabel }: { data: GroupRow[]; val
           content={<ChartTooltip valueLabel={valueLabel} />}
         />
         <Bar
-          dataKey="value"
+          dataKey="plotValue"
           fill={chart.series1}
           radius={[0, 4, 4, 0]}
           barSize={18}

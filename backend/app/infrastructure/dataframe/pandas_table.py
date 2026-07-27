@@ -241,17 +241,23 @@ class PandasDataTable:
                 continue
             values = series[_finite_mask(series)]
             described = values.describe()
+            if pd.api.types.is_integer_dtype(series) and not values.empty:
+                minimum = _api_number(int(values.min()))
+                maximum = _api_number(int(values.max()))
+            else:
+                minimum = self._safe_float(described.get("min"))
+                maximum = self._safe_float(described.get("max"))
             result.append(
                 NumericSummary(
                     column=column,
                     count=int(described.get("count", 0)),
                     mean=self._safe_float(described.get("mean")),
                     std=self._safe_float(described.get("std")),
-                    minimum=self._safe_float(described.get("min")),
+                    minimum=minimum,
                     p25=self._safe_float(described.get("25%")),
                     median=self._safe_float(described.get("50%")),
                     p75=self._safe_float(described.get("75%")),
-                    maximum=self._safe_float(described.get("max")),
+                    maximum=maximum,
                 )
             )
         return result
