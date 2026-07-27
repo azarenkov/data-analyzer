@@ -89,6 +89,11 @@ class PandasDatasetParser:
 
     @staticmethod
     def _decode(content: bytes) -> str:
+        if content.startswith((b"\xff\xfe", b"\xfe\xff")):
+            try:
+                return content.decode("utf-16")
+            except UnicodeDecodeError:
+                pass
         for encoding in ("utf-8-sig", "utf-8", "cp1251"):
             try:
                 return content.decode(encoding)

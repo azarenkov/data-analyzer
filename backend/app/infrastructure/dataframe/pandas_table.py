@@ -41,6 +41,14 @@ def _finite_mask(series: pd.Series) -> pd.Series:
     return mask.astype(bool)
 
 
+def _api_number(value: object) -> float | int | str | None:
+    if isinstance(value, (int, np.integer)) and not isinstance(value, bool):
+        exact = int(value)
+        return str(exact) if abs(exact) > _JS_SAFE_INT else exact
+    result = float(value)
+    return result if math.isfinite(result) else None
+
+
 def _sum_with_min_count(series: pd.Series) -> float:
     return series.sum(min_count=1)
 
@@ -259,16 +267,19 @@ class PandasDataTable:
             values = grouped[metric].agg(_AGG_MAP[aggregation])
         result = []
         for label, value in values.items():
-            if pd.isna(value) or not math.isfinite(float(value)):
+            if pd.isna(value):
+                continue
+            number = _api_number(value)
+            if number is None:
                 continue
             result.append(
                 GroupRow(
                     label="(пусто)" if pd.isna(label) else str(label),
-                    value=float(value),
+                    value=number,
                     count=int(counts.get(label, 0)),
                 )
             )
-        result.sort(key=lambda g: g.value, reverse=True)
+        result.sort(key=lambda g: float(g.value), reverse=True)
         return result
 
     def time_series(
@@ -289,11 +300,14 @@ class PandasDataTable:
             values = df.groupby(grouper)[metric].agg(_AGG_MAP[aggregation])
         result = []
         for period, value in values.items():
-            if pd.isna(value) or not math.isfinite(float(value)):
+            if pd.isna(value):
+                continue
+            number = _api_number(value)
+            if number is None:
                 continue
             if frequency == TimeFrequency.WEEK:
                 period = period - pd.Timedelta(days=6)
-            result.append(TimePoint(period=self._period_label(period, frequency), value=float(value)))
+            result.append(TimePoint(period=self._period_label(period, frequency), value=number))
         return result
 
     @staticmethod

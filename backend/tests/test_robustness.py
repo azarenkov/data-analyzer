@@ -460,3 +460,23 @@ def test_nonscalar_datetime_filter_rejected(client):
         json={"filters": [{"column": "day", "operator": "gte", "value": ["2025-01-01", "2025-01-02"]}]},
     )
     assert response.status_code == 400
+
+
+def test_group_aggregate_keeps_large_integers_exact(client):
+    meta = _upload_csv(client, b"grp,amount\na,9007199254740993\nb,5\n")
+    response = client.get(
+        f"/api/datasets/{meta['id']}/group-by",
+        params={"by": "grp", "metric": "amount", "aggregation": "sum"},
+    )
+    assert response.status_code == 200
+    values = {g["label"]: g["value"] for g in response.json()}
+    assert values["a"] == "9007199254740993"
+    assert values["b"] == 5
+
+
+def test_utf16_csv_upload(client):
+    content = "city,value\nАстана,10\nАлматы,20\n".encode("utf-16")
+    meta = _upload_csv(client, content)
+    assert meta["rowCount"] == 2
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    assert {row["city"] for row in page["rows"]} == {"Астана", "Алматы"}

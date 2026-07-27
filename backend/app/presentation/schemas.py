@@ -88,13 +88,13 @@ class NumericSummarySchema(ApiModel):
 
 class GroupRowSchema(ApiModel):
     label: str
-    value: float
+    value: int | float | str
     count: int
 
 
 class TimePointSchema(ApiModel):
     period: str
-    value: float
+    value: int | float | str
 
 
 class InsightSchema(ApiModel):

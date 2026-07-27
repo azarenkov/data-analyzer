@@ -27,14 +27,14 @@ class NumericSummary:
 @dataclass(frozen=True)
 class GroupRow:
     label: str
-    value: float
+    value: float | int | str
     count: int
 
 
 @dataclass(frozen=True)
 class TimePoint:
     period: str
-    value: float
+    value: float | int | str
 
 
 @dataclass(frozen=True)

@@ -138,11 +138,11 @@ class GenerateInsights:
         aggregation = Aggregation.SUM if metric else Aggregation.COUNT
         for category in categories:
             groups = table.group_by(by=category, metric=metric, aggregation=aggregation, filters=[])
-            total = sum(abs(g.value) for g in groups)
+            total = sum(abs(float(g.value)) for g in groups)
             if not groups or total == 0:
                 continue
-            top = max(groups, key=lambda g: abs(g.value))
-            share = abs(top.value) / total * 100
+            top = max(groups, key=lambda g: abs(float(g.value)))
+            share = abs(float(top.value)) / total * 100
             if share < 40:
                 continue
             result.append(

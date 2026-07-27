@@ -64,13 +64,13 @@ export interface NumericSummary {
 
 export interface GroupRow {
   label: string;
-  value: number;
+  value: number | string;
   count: number;
 }
 
 export interface TimePoint {
   period: string;
-  value: number;
+  value: number | string;
 }
 
 export interface Insight {
