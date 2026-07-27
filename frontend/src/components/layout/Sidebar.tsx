@@ -21,7 +21,7 @@ export function Sidebar({ datasets, activeId, onSelect }: SidebarProps) {
 
   return (
     <aside className="sidebar">
-      <div className="wordmark sidebar-wordmark">Разбор</div>
+      <div className="wordmark sidebar-wordmark">Анализ данных</div>
       <div className="sidebar-section-label">Файлы</div>
       <nav className="sidebar-list">
         {datasets.map((dataset) => (

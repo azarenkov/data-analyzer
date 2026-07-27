@@ -20,15 +20,10 @@ export function UploadScreen({ onUploaded }: { onUploaded: (id: string) => void 
   return (
     <div className="upload-screen">
       <header className="upload-brand">
-        <span className="wordmark">Разбор</span>
-        <span className="upload-brand-sub">внутренний инструмент анализа данных</span>
+        <span className="wordmark">Внутренний инструмент анализа данных</span>
       </header>
       <main className="upload-main">
-        <h1 className="upload-title">
-          Файл — на вход.
-          <br />
-          Понимание — на выход.
-        </h1>
+        <h1 className="upload-title">Анализ данных из файла</h1>
         <p className="upload-lede">
           Загрузите таблицу и получите структуру, статистику, графики и инсайты — без
           ноутбуков и SQL.
