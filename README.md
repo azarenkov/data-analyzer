@@ -4,6 +4,13 @@
 
 ## Запуск
 
+### Клонирование
+
+```bash
+git clone https://github.com/azarenkov/data-analyzer.git
+cd data-analyzer
+```
+
 ### Docker (рекомендуемый способ)
 
 Требуется Docker с Compose.
