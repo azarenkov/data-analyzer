@@ -4,6 +4,7 @@ import pandas as pd
 
 from app.domain.dataset.entity import Dataset
 from app.domain.dataset.results import Insight
+from app.infrastructure.dataframe.pandas_table import safe_excel_writer
 
 
 class XlsxReportBuilder:
@@ -51,10 +52,12 @@ class XlsxReportBuilder:
         insight_rows = pd.DataFrame(
             [{"Инсайт": i.title, "Описание": i.detail} for i in insights]
         )
-        data = pd.DataFrame(table.rows(filters=[], sort=[], page=1, page_size=10_000).rows)
+        data = pd.DataFrame(
+            table.rows(filters=[], sort=[], page=1, page_size=max(table.row_count(), 1)).rows
+        )
 
         buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        with safe_excel_writer(buffer) as writer:
             overview.to_excel(writer, index=False, sheet_name="Обзор")
             columns.to_excel(writer, index=False, sheet_name="Колонки")
             if not summary.empty:

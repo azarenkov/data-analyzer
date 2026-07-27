@@ -37,6 +37,16 @@ _AGG_MAP = {
     Aggregation.MAX: "max",
 }
 
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def safe_excel_writer(buffer: io.BytesIO) -> pd.ExcelWriter:
+    return pd.ExcelWriter(
+        buffer,
+        engine="xlsxwriter",
+        engine_kwargs={"options": {"strings_to_formulas": False, "strings_to_urls": False}},
+    )
+
 
 class PandasDataTable:
     def __init__(self, frame: pd.DataFrame) -> None:
@@ -54,7 +64,7 @@ class PandasDataTable:
             if non_null.empty:
                 continue
             parsed = pd.to_datetime(non_null, errors="coerce", format="mixed")
-            if parsed.notna().sum() / len(non_null) >= 0.9:
+            if parsed.notna().all():
                 df[column] = pd.to_datetime(series, errors="coerce", format="mixed")
         return df
 
@@ -283,14 +293,23 @@ class PandasDataTable:
     ) -> bytes:
         df = self._apply_sort(self._apply_filters(self._df, filters), sort)
         if fmt == ExportFormat.CSV:
-            return df.to_csv(index=False).encode("utf-8-sig")
+            return self._escape_csv_formulas(df).to_csv(index=False).encode("utf-8-sig")
         buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        with safe_excel_writer(buffer) as writer:
             df.to_excel(writer, index=False, sheet_name="Data")
         return buffer.getvalue()
 
-    def frame_records(self, limit: int = 10_000) -> list[dict]:
-        return self._records(self._df.head(limit))
+    @staticmethod
+    def _escape_csv_formulas(df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        for column in out.columns:
+            series = out[column]
+            if not (pd.api.types.is_string_dtype(series) or series.dtype == object):
+                continue
+            mask = series.notna() & series.astype(str).str.startswith(_FORMULA_PREFIXES)
+            if mask.any():
+                out.loc[mask, column] = "'" + series[mask].astype(str)
+        return out
 
     def _apply_filters(self, df: pd.DataFrame, filters: list[FilterSpec]) -> pd.DataFrame:
         for spec in filters:
