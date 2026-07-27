@@ -49,7 +49,12 @@ def _api_number(value: object) -> float | int | str | None:
     return result if math.isfinite(result) else None
 
 
-def _sum_with_min_count(series: pd.Series) -> float:
+def _sum_with_min_count(series: pd.Series) -> object:
+    if pd.api.types.is_integer_dtype(series):
+        values = series.dropna()
+        if values.empty:
+            return np.nan
+        return sum(int(v) for v in values)
     return series.sum(min_count=1)
 
 
@@ -64,6 +69,21 @@ _AGG_MAP = {
 _JS_SAFE_INT = 9_007_199_254_740_991
 
 _EXCEL_SAFE_INT = 999_999_999_999_999
+
+_EXCEL_MAX_CELL_LEN = 32_767
+
+
+def ensure_excel_cell_limits(df: pd.DataFrame) -> None:
+    for column in df.columns:
+        series = df[column]
+        if not (pd.api.types.is_string_dtype(series) or series.dtype == object):
+            continue
+        lengths = series.dropna().astype(str).str.len()
+        if not lengths.empty and int(lengths.max()) > _EXCEL_MAX_CELL_LEN:
+            raise InvalidQueryError(
+                f"Column '{column}' has cells longer than {_EXCEL_MAX_CELL_LEN} characters, "
+                "which XLSX cannot store; export CSV instead"
+            )
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
@@ -398,9 +418,11 @@ class PandasDataTable:
             raise InvalidQueryError(
                 f"XLSX supports at most {_EXCEL_MAX_COLS} columns; export CSV instead"
             )
+        safe = excel_safe_frame(df)
+        ensure_excel_cell_limits(safe)
         buffer = io.BytesIO()
         with safe_excel_writer(buffer) as writer:
-            excel_safe_frame(df).to_excel(writer, index=False, sheet_name="Data")
+            safe.to_excel(writer, index=False, sheet_name="Data")
         return buffer.getvalue()
 
     @staticmethod

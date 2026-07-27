@@ -9,6 +9,7 @@ from app.infrastructure.dataframe.pandas_table import (
     _EXCEL_MAX_COLS,
     _EXCEL_MAX_ROWS,
     PandasDataTable,
+    ensure_excel_cell_limits,
     excel_safe_frame,
     safe_excel_writer,
 )
@@ -69,6 +70,7 @@ class XlsxReportBuilder:
         )
         if isinstance(table, PandasDataTable):
             data = excel_safe_frame(table.frame())
+            ensure_excel_cell_limits(data)
         else:
             data = excel_safe_frame(
                 pd.DataFrame(

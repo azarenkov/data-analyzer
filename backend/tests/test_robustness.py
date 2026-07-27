@@ -492,3 +492,30 @@ def test_csv_export_deduplicates_escaped_headers(client):
     header = response.content.decode("utf-8-sig").splitlines()[0]
     assert "'=amount" in header
     assert "'=amount_2" in header
+
+
+def test_integer_group_sum_does_not_overflow(client):
+    meta = _upload_csv(
+        client,
+        b"grp,amount\na,5000000000000000000\na,5000000000000000000\nb,1\n",
+    )
+    response = client.get(
+        f"/api/datasets/{meta['id']}/group-by",
+        params={"by": "grp", "metric": "amount", "aggregation": "sum"},
+    )
+    assert response.status_code == 200
+    values = {g["label"]: g["value"] for g in response.json()}
+    assert values["a"] == "10000000000000000000"
+    assert values["b"] == 1
+
+
+def test_xlsx_export_rejects_overlong_cells(client):
+    long_value = "x" * 33_000
+    meta = _upload_csv(client, f"name,note\nalpha,{long_value}\n".encode())
+    xlsx = client.post(f"/api/datasets/{meta['id']}/export", json={"format": "xlsx"})
+    assert xlsx.status_code == 400
+    assert "CSV" in xlsx.json()["detail"]
+    csv_export = client.post(f"/api/datasets/{meta['id']}/export", json={"format": "csv"})
+    assert csv_export.status_code == 200
+    report = client.get(f"/api/datasets/{meta['id']}/report")
+    assert report.status_code == 400
