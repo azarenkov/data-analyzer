@@ -4,6 +4,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.domain.dataset.entity import Dataset
 from app.domain.dataset.errors import FileTooLargeError
@@ -71,7 +72,9 @@ async def upload_dataset(file: UploadFile, container: ContainerDep) -> DatasetMe
         content.extend(chunk)
         if len(content) > MAX_UPLOAD_BYTES:
             raise FileTooLargeError(MAX_UPLOAD_BYTES)
-    dataset = container.upload_dataset.execute(file.filename or "dataset", bytes(content))
+    dataset = await run_in_threadpool(
+        container.upload_dataset.execute, file.filename or "dataset", bytes(content)
+    )
     return _meta(dataset)
 
 

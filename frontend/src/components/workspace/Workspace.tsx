@@ -66,6 +66,10 @@ export function Workspace({ datasetId }: { datasetId: string }) {
         </button>
       </header>
 
+      {report.isError && (
+        <p className="error-note">{(report.error as Error).message}</p>
+      )}
+
       <nav className="tab-bar">
         {TABS.map((item) => (
           <button

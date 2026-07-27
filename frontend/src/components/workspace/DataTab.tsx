@@ -122,7 +122,14 @@ export function DataTab({ datasetId, columns }: { datasetId: string; columns: Co
               </span>
               <input
                 className="field-input"
-                type={draftKind === "numeric" ? "number" : draftKind === "datetime" ? "date" : "text"}
+                type={
+                  draftKind === "numeric"
+                    ? "number"
+                    : draftKind === "datetime"
+                      ? "datetime-local"
+                      : "text"
+                }
+                step={draftKind === "datetime" ? 1 : undefined}
                 value={draftValue}
                 placeholder={effectiveOperator === "in" ? "UAE, UK, USA" : "…"}
                 onChange={(e) => setDraftValue(e.target.value)}
@@ -185,6 +192,9 @@ export function DataTab({ datasetId, columns }: { datasetId: string; columns: Co
           </div>
         </header>
 
+        {exportRows.isError && (
+          <p className="error-note">{(exportRows.error as Error).message}</p>
+        )}
         {query.isError ? (
           <p className="error-note">{(query.error as Error).message}</p>
         ) : (
