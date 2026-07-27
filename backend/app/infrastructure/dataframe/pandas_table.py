@@ -392,6 +392,10 @@ class PandasDataTable:
     @staticmethod
     def _escape_csv_formulas(df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
+        out.columns = [
+            f"'{name}" if str(name).startswith(_FORMULA_PREFIXES) else name
+            for name in out.columns
+        ]
         for column in out.columns:
             series = out[column]
             if not (pd.api.types.is_string_dtype(series) or series.dtype == object):
@@ -446,6 +450,8 @@ class PandasDataTable:
 
     @staticmethod
     def _coerce(series: pd.Series, value: object) -> object:
+        if isinstance(value, (list, tuple, set, dict)):
+            raise InvalidQueryError(f"Filter value must be a scalar, got '{value}'")
         try:
             if pd.api.types.is_bool_dtype(series):
                 if isinstance(value, bool):

@@ -441,3 +441,22 @@ def test_oversized_decompressed_workbook_rejected(client, monkeypatch):
     )
     assert response.status_code == 400
     assert "expands" in response.json()["detail"]
+
+
+def test_csv_export_escapes_formula_headers(client):
+    meta = _upload_csv(client, b"=cmd,name\n1,alpha\n")
+    response = client.post(
+        f"/api/datasets/{meta['id']}/export",
+        json={"format": "csv"},
+    )
+    text = response.content.decode("utf-8-sig")
+    assert text.splitlines()[0].startswith("'=cmd")
+
+
+def test_nonscalar_datetime_filter_rejected(client):
+    meta = _upload_csv(client, b"day,value\n2025-01-01,1\n2025-01-02,2\n")
+    response = client.post(
+        f"/api/datasets/{meta['id']}/query",
+        json={"filters": [{"column": "day", "operator": "gte", "value": ["2025-01-01", "2025-01-02"]}]},
+    )
+    assert response.status_code == 400
