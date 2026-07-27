@@ -3,6 +3,7 @@ import io
 import zipfile
 
 import pandas as pd
+from charset_normalizer import from_bytes
 
 from app.domain.dataset.errors import DomainError, FileParsingError, UnsupportedFileError
 from app.infrastructure.dataframe.pandas_table import PandasDataTable
@@ -99,25 +100,12 @@ class PandasDatasetParser:
                 return content.decode(encoding)
             except UnicodeDecodeError:
                 continue
-        legacy = PandasDatasetParser._detect_legacy_encoding(content)
+        detected = from_bytes(content, cp_isolation=["cp1251", "cp1252"]).best()
+        if detected is not None:
+            return str(detected)
+        distinct_high_bytes = len({byte for byte in content if byte >= 0xC0})
+        legacy = "cp1251" if distinct_high_bytes >= 8 else "cp1252"
         try:
             return content.decode(legacy)
         except UnicodeDecodeError:
             return content.decode("utf-8", errors="replace")
-
-    @staticmethod
-    def _detect_legacy_encoding(content: bytes) -> str:
-        runs = []
-        current = 0
-        for byte in content:
-            if byte >= 0x80:
-                current += 1
-            elif current:
-                runs.append(current)
-                current = 0
-        if current:
-            runs.append(current)
-        if not runs:
-            return "cp1252"
-        mean_run = sum(runs) / len(runs)
-        return "cp1251" if mean_run >= 2.5 else "cp1252"

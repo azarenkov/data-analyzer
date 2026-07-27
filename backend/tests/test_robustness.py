@@ -565,3 +565,22 @@ def test_cp1251_csv_decoded_correctly(client):
     meta = _upload_csv(client, content)
     page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
     assert {row["город"] for row in page["rows"]} == {"Астана", "Алматы"}
+
+
+def test_dayfirst_evidence_beyond_first_200_rows(client):
+    rows = ["day,value"] + [f"01/02/2025,{i}" for i in range(250)] + ["13/02/2025,999"]
+    meta = _upload_csv(client, "\n".join(rows).encode())
+    page = client.post(
+        f"/api/datasets/{meta['id']}/query",
+        json={"filters": [{"column": "value", "operator": "eq", "value": "999"}]},
+    ).json()
+    assert page["rows"][0]["day"] == "2025-02-13"
+    first = client.post(f"/api/datasets/{meta['id']}/query", json={"pageSize": 1}).json()
+    assert first["rows"][0]["day"] == "2025-02-01"
+
+
+def test_cp1252_accent_runs_decoded_correctly(client):
+    content = "name,value\nééé,1\nüüü,2\n".encode("cp1252")
+    meta = _upload_csv(client, content)
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    assert {row["name"] for row in page["rows"]} == {"ééé", "üüü"}

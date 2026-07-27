@@ -1,7 +1,6 @@
 import io
 import json
 import math
-import re
 
 import numpy as np
 import pandas as pd
@@ -159,25 +158,19 @@ class PandasDataTable:
 
     @staticmethod
     def _detect_dayfirst(series: pd.Series) -> bool:
-        pattern = re.compile(r"^(\d{1,2})([./])(\d{1,2})\2(\d{4})")
-        firsts: list[int] = []
-        seconds: list[int] = []
-        dotted = 0
-        for value in series.dropna().astype(str).str.strip().head(200):
-            match = pattern.match(value)
-            if not match:
-                return False
-            firsts.append(int(match.group(1)))
-            seconds.append(int(match.group(3)))
-            if match.group(2) == ".":
-                dotted += 1
-        if not firsts:
+        stripped = series.dropna().astype(str).str.strip()
+        if stripped.empty:
             return False
-        if max(seconds) > 12:
+        parts = stripped.str.extract(
+            r"^(?P<first>\d{1,2})(?P<sep>[./])(?P<second>\d{1,2})(?P=sep)(?P<year>\d{4})"
+        )
+        if parts["first"].isna().any():
             return False
-        if max(firsts) > 12:
+        if parts["second"].astype(int).max() > 12:
+            return False
+        if parts["first"].astype(int).max() > 12:
             return True
-        return dotted == len(firsts)
+        return bool((parts["sep"] == ".").all())
 
     @staticmethod
     def _parse_datetime(series: pd.Series) -> pd.Series | None:
