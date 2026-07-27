@@ -1,4 +1,5 @@
 import io
+import math
 
 import numpy as np
 import pandas as pd
@@ -382,7 +383,13 @@ class PandasDataTable:
             if pd.api.types.is_numeric_dtype(series):
                 return float(value)
             if pd.api.types.is_datetime64_any_dtype(series):
-                return pd.to_datetime(value)
+                timestamp = pd.to_datetime(value)
+                series_tz = getattr(series.dtype, "tz", None)
+                if series_tz is not None and timestamp.tzinfo is None:
+                    return timestamp.tz_localize(series_tz)
+                if series_tz is None and timestamp.tzinfo is not None:
+                    return timestamp.tz_convert("UTC").tz_localize(None)
+                return timestamp
         except (TypeError, ValueError) as error:
             raise InvalidQueryError(f"Invalid filter value '{value}'") from error
         return value
@@ -432,4 +439,5 @@ class PandasDataTable:
     def _safe_float(value: object) -> float | None:
         if value is None or pd.isna(value):
             return None
-        return float(value)
+        result = float(value)
+        return result if math.isfinite(result) else None

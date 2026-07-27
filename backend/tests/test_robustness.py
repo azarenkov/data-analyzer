@@ -62,3 +62,23 @@ def test_xlsx_export_rejects_rows_over_excel_limit():
     table = PandasDataTable(pd.DataFrame({"a": range(1_048_576)}))
     with pytest.raises(InvalidQueryError):
         table.export(filters=[], sort=[], fmt=ExportFormat.XLSX)
+
+
+def test_datetime_filter_on_timezone_aware_column(client):
+    rows = ["ts,value"] + [f"2025-01-{i:02d}T10:00:00Z,{i}" for i in range(1, 6)]
+    meta = _upload_csv(client, "\n".join(rows).encode())
+    page = client.post(
+        f"/api/datasets/{meta['id']}/query",
+        json={"filters": [{"column": "ts", "operator": "gte", "value": "2025-01-03"}]},
+    )
+    assert page.status_code == 200
+    assert {row["value"] for row in page.json()["rows"]} == {3, 4, 5}
+
+
+def test_summary_with_infinite_values(client):
+    meta = _upload_csv(client, b"name,ratio\nalpha,inf\nbeta,2.5\ngamma,-inf\n")
+    response = client.get(f"/api/datasets/{meta['id']}/summary")
+    assert response.status_code == 200
+    ratio = next(s for s in response.json() if s["column"] == "ratio")
+    assert ratio["maximum"] is None
+    assert ratio["minimum"] is None
