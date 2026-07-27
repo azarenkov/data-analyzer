@@ -1,10 +1,13 @@
 import csv
 import io
+import zipfile
 
 import pandas as pd
 
 from app.domain.dataset.errors import DomainError, FileParsingError, UnsupportedFileError
 from app.infrastructure.dataframe.pandas_table import PandasDataTable
+
+MAX_DECOMPRESSED_BYTES = 200 * 1024 * 1024
 
 
 class PandasDatasetParser:
@@ -30,6 +33,8 @@ class PandasDatasetParser:
             )
             return frame.apply(self._infer_series)
         if extension in ("xlsx", "xls"):
+            if extension == "xlsx":
+                self._check_decompressed_size(content)
             return pd.read_excel(
                 io.BytesIO(content),
                 keep_default_na=False,
@@ -39,6 +44,18 @@ class PandasDatasetParser:
         if extension == "json":
             return pd.read_json(io.BytesIO(content))
         raise UnsupportedFileError(filename)
+
+    @staticmethod
+    def _check_decompressed_size(content: bytes) -> None:
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                total = sum(entry.file_size for entry in archive.infolist())
+        except zipfile.BadZipFile as error:
+            raise FileParsingError("file is not a valid xlsx workbook") from error
+        if total > MAX_DECOMPRESSED_BYTES:
+            raise FileParsingError(
+                f"workbook expands to more than {MAX_DECOMPRESSED_BYTES // (1024 * 1024)} MB"
+            )
 
     @staticmethod
     def _infer_series(series: pd.Series) -> pd.Series:

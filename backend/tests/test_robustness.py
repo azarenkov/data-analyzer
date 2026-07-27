@@ -424,3 +424,20 @@ def test_leading_zero_codes_stay_text(client):
     assert kinds["qty"] == "numeric"
     page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
     assert [row["zip"] for row in page["rows"]] == ["00123", "00456", "77000"]
+
+
+def test_oversized_decompressed_workbook_rejected(client, monkeypatch):
+    import io
+
+    from app.infrastructure.dataframe import parser
+
+    frame = pd.DataFrame({"a": range(100), "b": range(100)})
+    buffer = io.BytesIO()
+    frame.to_excel(buffer, index=False)
+    monkeypatch.setattr(parser, "MAX_DECOMPRESSED_BYTES", 64)
+    response = client.post(
+        "/api/datasets",
+        files={"file": ("bomb.xlsx", buffer.getvalue())},
+    )
+    assert response.status_code == 400
+    assert "expands" in response.json()["detail"]
