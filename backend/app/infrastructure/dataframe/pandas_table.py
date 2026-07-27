@@ -74,6 +74,12 @@ _EXCEL_MAX_CELL_LEN = 32_767
 
 
 def ensure_excel_cell_limits(df: pd.DataFrame) -> None:
+    for name in df.columns:
+        if len(str(name)) > _EXCEL_MAX_CELL_LEN:
+            raise InvalidQueryError(
+                f"Column name '{str(name)[:40]}…' is longer than {_EXCEL_MAX_CELL_LEN} "
+                "characters, which XLSX cannot store; export CSV instead"
+            )
     for column in df.columns:
         series = df[column]
         if not (pd.api.types.is_string_dtype(series) or series.dtype == object):

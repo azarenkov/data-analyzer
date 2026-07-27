@@ -16,6 +16,19 @@ export default function App() {
     return <div className="app-boot">Загрузка…</div>;
   }
 
+  if (datasets.isError) {
+    return (
+      <div className="app-boot">
+        <div className="boot-error">
+          <p>Не удалось загрузить список файлов: {(datasets.error as Error).message}</p>
+          <button className="btn" onClick={() => datasets.refetch()}>
+            Повторить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!activeId) {
     return <UploadScreen onUploaded={setSelectedId} />;
   }

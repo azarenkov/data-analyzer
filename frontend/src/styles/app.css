@@ -68,6 +68,18 @@ input:focus-visible,
   font-size: 13px;
 }
 
+.boot-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: var(--danger);
+  font-family: var(--font-body);
+  font-size: 14px;
+  text-align: center;
+  padding: 24px;
+}
+
 .wordmark {
   font-weight: 800;
   font-size: 17px;

@@ -528,3 +528,11 @@ def test_summary_keeps_large_integer_extrema_exact(client):
     summary = next(s for s in response.json() if s["column"] == "id")
     assert summary["maximum"] == "9007199254740993"
     assert summary["minimum"] == 5
+
+
+def test_xlsx_export_rejects_overlong_header(client):
+    header = "h" * 33_000
+    meta = _upload_csv(client, f"{header},value\n1,2\n".encode())
+    response = client.post(f"/api/datasets/{meta['id']}/export", json={"format": "xlsx"})
+    assert response.status_code == 400
+    assert "CSV" in response.json()["detail"]
