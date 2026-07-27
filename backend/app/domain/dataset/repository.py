@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from app.domain.dataset.entity import Dataset
+
+
+class DatasetRepository(Protocol):
+    def add(self, dataset: Dataset) -> None: ...
+
+    def get(self, dataset_id: str) -> Dataset: ...
+
+    def list_all(self) -> list[Dataset]: ...
+
+    def remove(self, dataset_id: str) -> None: ...
