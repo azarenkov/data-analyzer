@@ -344,3 +344,13 @@ def test_na_like_strings_are_preserved(client):
     page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
     codes = [row["code"] for row in page["rows"]]
     assert codes == ["NA", "N/A", "NULL", None]
+
+
+def test_report_keeps_dates_typed(client):
+    import io
+
+    meta = _upload_csv(client, b"day,value\n2025-01-01,1\n2025-01-02,2\n")
+    response = client.get(f"/api/datasets/{meta['id']}/report")
+    assert response.status_code == 200
+    frame = pd.read_excel(io.BytesIO(response.content), sheet_name="Данные")
+    assert frame["day"].dtype.kind == "M"

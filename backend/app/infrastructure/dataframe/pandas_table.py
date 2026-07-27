@@ -140,6 +140,9 @@ class PandasDataTable:
             result.append(name)
         return result
 
+    def frame(self) -> pd.DataFrame:
+        return self._df.copy()
+
     def row_count(self) -> int:
         return int(len(self._df))
 

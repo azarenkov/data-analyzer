@@ -8,6 +8,7 @@ from app.domain.dataset.errors import InvalidQueryError
 from app.infrastructure.dataframe.pandas_table import (
     _EXCEL_MAX_COLS,
     _EXCEL_MAX_ROWS,
+    PandasDataTable,
     excel_safe_frame,
     safe_excel_writer,
 )
@@ -66,11 +67,16 @@ class XlsxReportBuilder:
         insight_rows = pd.DataFrame(
             [{"Инсайт": i.title, "Описание": i.detail} for i in insights]
         )
-        data = excel_safe_frame(
-            pd.DataFrame(
-                table.rows(filters=[], sort=[], page=1, page_size=max(table.row_count(), 1)).rows
+        if isinstance(table, PandasDataTable):
+            data = excel_safe_frame(table.frame())
+        else:
+            data = excel_safe_frame(
+                pd.DataFrame(
+                    table.rows(
+                        filters=[], sort=[], page=1, page_size=max(table.row_count(), 1)
+                    ).rows
+                )
             )
-        )
 
         buffer = io.BytesIO()
         with safe_excel_writer(buffer) as writer:
