@@ -536,3 +536,32 @@ def test_xlsx_export_rejects_overlong_header(client):
     response = client.post(f"/api/datasets/{meta['id']}/export", json={"format": "xlsx"})
     assert response.status_code == 400
     assert "CSV" in response.json()["detail"]
+
+
+def test_dayfirst_dates_detected(client):
+    meta = _upload_csv(client, b"day,value\n13/02/2025,1\n01/02/2025,2\n28/02/2025,3\n")
+    overview = client.get(f"/api/datasets/{meta['id']}").json()
+    kinds = {c["name"]: c["kind"] for c in overview["columns"]}
+    assert kinds["day"] == "datetime"
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    assert [row["day"] for row in page["rows"]] == ["2025-02-13", "2025-02-01", "2025-02-28"]
+
+
+def test_dotted_dates_parse_dayfirst(client):
+    meta = _upload_csv(client, b"day,value\n01.02.2025,1\n02.02.2025,2\n03.02.2025,3\n")
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    assert [row["day"] for row in page["rows"]] == ["2025-02-01", "2025-02-02", "2025-02-03"]
+
+
+def test_cp1252_csv_decoded_correctly(client):
+    content = "name,city\ncafé,Genève\nnoël,Zürich\n".encode("cp1252")
+    meta = _upload_csv(client, content)
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    assert {row["name"] for row in page["rows"]} == {"café", "noël"}
+
+
+def test_cp1251_csv_decoded_correctly(client):
+    content = "город,значение\nАстана,10\nАлматы,20\n".encode("cp1251")
+    meta = _upload_csv(client, content)
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    assert {row["город"] for row in page["rows"]} == {"Астана", "Алматы"}

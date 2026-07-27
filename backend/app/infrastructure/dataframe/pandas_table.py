@@ -1,6 +1,7 @@
 import io
 import json
 import math
+import re
 
 import numpy as np
 import pandas as pd
@@ -157,15 +158,40 @@ class PandasDataTable:
         return df
 
     @staticmethod
+    def _detect_dayfirst(series: pd.Series) -> bool:
+        pattern = re.compile(r"^(\d{1,2})([./])(\d{1,2})\2(\d{4})")
+        firsts: list[int] = []
+        seconds: list[int] = []
+        dotted = 0
+        for value in series.dropna().astype(str).str.strip().head(200):
+            match = pattern.match(value)
+            if not match:
+                return False
+            firsts.append(int(match.group(1)))
+            seconds.append(int(match.group(3)))
+            if match.group(2) == ".":
+                dotted += 1
+        if not firsts:
+            return False
+        if max(seconds) > 12:
+            return False
+        if max(firsts) > 12:
+            return True
+        return dotted == len(firsts)
+
+    @staticmethod
     def _parse_datetime(series: pd.Series) -> pd.Series | None:
+        dayfirst = PandasDataTable._detect_dayfirst(series)
         try:
-            parsed = pd.to_datetime(series, errors="coerce", format="mixed")
+            parsed = pd.to_datetime(series, errors="coerce", format="mixed", dayfirst=dayfirst)
             if pd.api.types.is_datetime64_any_dtype(parsed):
                 return parsed
         except (ValueError, TypeError):
             pass
         try:
-            parsed = pd.to_datetime(series, errors="coerce", format="mixed", utc=True)
+            parsed = pd.to_datetime(
+                series, errors="coerce", format="mixed", dayfirst=dayfirst, utc=True
+            )
         except (ValueError, TypeError):
             return None
         return parsed if pd.api.types.is_datetime64_any_dtype(parsed) else None

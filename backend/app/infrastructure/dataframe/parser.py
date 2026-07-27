@@ -94,9 +94,30 @@ class PandasDatasetParser:
                 return content.decode("utf-16")
             except UnicodeDecodeError:
                 pass
-        for encoding in ("utf-8-sig", "utf-8", "cp1251"):
+        for encoding in ("utf-8-sig", "utf-8"):
             try:
                 return content.decode(encoding)
             except UnicodeDecodeError:
                 continue
-        return content.decode("utf-8", errors="replace")
+        legacy = PandasDatasetParser._detect_legacy_encoding(content)
+        try:
+            return content.decode(legacy)
+        except UnicodeDecodeError:
+            return content.decode("utf-8", errors="replace")
+
+    @staticmethod
+    def _detect_legacy_encoding(content: bytes) -> str:
+        runs = []
+        current = 0
+        for byte in content:
+            if byte >= 0x80:
+                current += 1
+            elif current:
+                runs.append(current)
+                current = 0
+        if current:
+            runs.append(current)
+        if not runs:
+            return "cp1252"
+        mean_run = sum(runs) / len(runs)
+        return "cp1251" if mean_run >= 2.5 else "cp1252"
