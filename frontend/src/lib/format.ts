@@ -14,7 +14,9 @@ export function formatNumber(value: number | null | undefined, digits = 2): stri
 
 export function formatCell(value: string | number | boolean | null): string {
   if (value === null || value === undefined) return "—";
-  if (typeof value === "number") return formatNumber(value);
+  if (typeof value === "number") {
+    return value.toLocaleString("ru-RU", { maximumFractionDigits: 6 });
+  }
   if (typeof value === "boolean") return value ? "да" : "нет";
   return String(value);
 }

@@ -160,3 +160,60 @@ def test_summary_ignores_non_finite_observations(client):
     assert ratio["count"] == 1
     assert ratio["mean"] == 2.5
     assert ratio["maximum"] == 2.5
+
+
+def test_big_integers_serialize_as_strings(client):
+    meta = _upload_csv(client, b"id,name\n9007199254740993,alpha\n5,beta\n")
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={})
+    rows = {row["name"]: row["id"] for row in page.json()["rows"]}
+    assert rows["alpha"] == "9007199254740993"
+    assert rows["beta"] == 5
+
+
+def test_group_sum_skips_all_missing_groups(client):
+    meta = _upload_csv(client, b"grp,ratio\na,\na,\nb,2.0\nb,3.0\n")
+    response = client.get(
+        f"/api/datasets/{meta['id']}/group-by",
+        params={"by": "grp", "metric": "ratio", "aggregation": "sum"},
+    )
+    assert response.status_code == 200
+    groups = response.json()
+    assert [g["label"] for g in groups] == ["b"]
+    assert groups[0]["value"] == 5.0
+
+
+def test_contains_does_not_match_missing_cells(client):
+    meta = _upload_csv(client, b"name,note\nalpha,\nbeta,banana\n")
+    hit = client.post(
+        f"/api/datasets/{meta['id']}/query",
+        json={"filters": [{"column": "note", "operator": "contains", "value": "nan"}]},
+    ).json()
+    assert [row["name"] for row in hit["rows"]] == ["beta"]
+    miss = client.post(
+        f"/api/datasets/{meta['id']}/query",
+        json={"filters": [{"column": "note", "operator": "contains", "value": "xyz"}]},
+    ).json()
+    assert miss["rows"] == []
+
+
+def test_mixed_offset_timestamps_detected_as_datetime(client):
+    meta = _upload_csv(
+        client,
+        b"ts,value\n2025-03-30T01:00:00+01:00,1\n2025-03-30T03:00:00+02:00,2\n2025-03-30T04:00:00+02:00,3\n",
+    )
+    overview = client.get(f"/api/datasets/{meta['id']}").json()
+    kinds = {c["name"]: c["kind"] for c in overview["columns"]}
+    assert kinds["ts"] == "datetime"
+
+
+def test_halves_change_ignores_non_finite_values():
+    frame = pd.DataFrame(
+        {
+            "day": pd.to_datetime([f"2025-01-{i:02d}" for i in range(1, 9)]),
+            "metric": [1.0, 2.0, 3.0, float("inf"), 5.0, 6.0, 7.0, 8.0],
+        }
+    )
+    table = PandasDataTable(frame)
+    changes = table.halves_change("day", "metric", by=None)
+    assert len(changes) == 1
+    assert changes[0].change_pct is not None

@@ -32,13 +32,19 @@ _FREQ_MAP = {
     TimeFrequency.QUARTER: "QS",
 }
 
+def _sum_with_min_count(series: pd.Series) -> float:
+    return series.sum(min_count=1)
+
+
 _AGG_MAP = {
-    Aggregation.SUM: "sum",
+    Aggregation.SUM: _sum_with_min_count,
     Aggregation.MEAN: "mean",
     Aggregation.MEDIAN: "median",
     Aggregation.MIN: "min",
     Aggregation.MAX: "max",
 }
+
+_JS_SAFE_INT = 9_007_199_254_740_991
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
@@ -75,10 +81,26 @@ class PandasDataTable:
             non_null = series.dropna()
             if non_null.empty:
                 continue
-            parsed = pd.to_datetime(non_null, errors="coerce", format="mixed")
-            if parsed.notna().all():
-                df[column] = pd.to_datetime(series, errors="coerce", format="mixed")
+            parsed = PandasDataTable._parse_datetime(non_null)
+            if parsed is not None and parsed.notna().all():
+                full = PandasDataTable._parse_datetime(series)
+                if full is not None:
+                    df[column] = full
         return df
+
+    @staticmethod
+    def _parse_datetime(series: pd.Series) -> pd.Series | None:
+        try:
+            parsed = pd.to_datetime(series, errors="coerce", format="mixed")
+            if pd.api.types.is_datetime64_any_dtype(parsed):
+                return parsed
+        except (ValueError, TypeError):
+            pass
+        try:
+            parsed = pd.to_datetime(series, errors="coerce", format="mixed", utc=True)
+        except (ValueError, TypeError):
+            return None
+        return parsed if pd.api.types.is_datetime64_any_dtype(parsed) else None
 
     @staticmethod
     def _unique_names(names) -> list[str]:
@@ -253,6 +275,7 @@ class PandasDataTable:
         self._require_datetime(date_column)
         self._require_numeric(metric)
         df = self._df.dropna(subset=[date_column, metric])
+        df = df[np.isfinite(df[metric])]
         if len(df) < 6:
             return []
         midpoint = df[date_column].median()
@@ -352,12 +375,12 @@ class PandasDataTable:
     def _filter_mask(self, series: pd.Series, spec: FilterSpec) -> pd.Series:
         op = spec.operator
         if op == FilterOperator.CONTAINS:
-            return series.astype(str).str.contains(
+            return series.notna() & series.astype(str).str.contains(
                 str(spec.value), case=False, na=False, regex=False
             )
         if op == FilterOperator.IN:
             values = spec.value if isinstance(spec.value, list) else [spec.value]
-            return series.astype(str).isin([str(v) for v in values])
+            return series.notna() & series.astype(str).isin([str(v) for v in values])
         value = self._coerce(series, spec.value)
         if op == FilterOperator.EQ:
             if pd.api.types.is_numeric_dtype(series) or pd.api.types.is_datetime64_any_dtype(series):
@@ -444,6 +467,10 @@ class PandasDataTable:
             series = converted[column]
             if pd.api.types.is_float_dtype(series):
                 converted[column] = series.mask(~np.isfinite(series))
+            elif pd.api.types.is_integer_dtype(series):
+                converted[column] = series.map(
+                    lambda v: str(v) if pd.notna(v) and abs(int(v)) > _JS_SAFE_INT else v
+                )
         converted = converted.astype(object).where(pd.notna(converted), None)
         return converted.to_dict(orient="records")
 
