@@ -53,7 +53,10 @@ export function UploadScreen({ onUploaded }: { onUploaded: (id: string) => void 
             type="file"
             accept=".csv,.xlsx,.xls,.json"
             hidden
-            onChange={(e) => handleFile(e.target.files?.[0] ?? undefined)}
+            onChange={(e) => {
+              handleFile(e.target.files?.[0] ?? undefined);
+              e.target.value = "";
+            }}
           />
           {upload.isPending ? (
             <span className="dropzone-status">Читаем файл…</span>

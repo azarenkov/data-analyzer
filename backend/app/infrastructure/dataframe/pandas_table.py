@@ -52,6 +52,8 @@ _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 _EXCEL_MAX_ROWS = 1_048_575
 
+_EXCEL_MAX_COLS = 16_384
+
 
 def safe_excel_writer(buffer: io.BytesIO) -> pd.ExcelWriter:
     return pd.ExcelWriter(
@@ -342,6 +344,10 @@ class PandasDataTable:
         if len(df) > _EXCEL_MAX_ROWS:
             raise InvalidQueryError(
                 f"XLSX supports at most {_EXCEL_MAX_ROWS} rows; export CSV instead"
+            )
+        if len(df.columns) > _EXCEL_MAX_COLS:
+            raise InvalidQueryError(
+                f"XLSX supports at most {_EXCEL_MAX_COLS} columns; export CSV instead"
             )
         buffer = io.BytesIO()
         with safe_excel_writer(buffer) as writer:

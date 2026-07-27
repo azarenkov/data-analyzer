@@ -285,3 +285,10 @@ def test_correlations_survive_infinite_values():
     pairs = table.correlation_pairs(limit=1)
     assert pairs
     assert abs(pairs[0].value - 1.0) < 1e-9
+
+
+def test_xlsx_export_rejects_too_many_columns():
+    frame = pd.DataFrame([[1] * 16_385], columns=[f"c{i}" for i in range(16_385)])
+    table = PandasDataTable(frame)
+    with pytest.raises(InvalidQueryError):
+        table.export(filters=[], sort=[], fmt=ExportFormat.XLSX)

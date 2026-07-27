@@ -5,7 +5,11 @@ import pandas as pd
 from app.domain.dataset.entity import Dataset
 from app.domain.dataset.results import Insight
 from app.domain.dataset.errors import InvalidQueryError
-from app.infrastructure.dataframe.pandas_table import _EXCEL_MAX_ROWS, safe_excel_writer
+from app.infrastructure.dataframe.pandas_table import (
+    _EXCEL_MAX_COLS,
+    _EXCEL_MAX_ROWS,
+    safe_excel_writer,
+)
 
 
 class XlsxReportBuilder:
@@ -14,6 +18,10 @@ class XlsxReportBuilder:
         if table.row_count() > _EXCEL_MAX_ROWS:
             raise InvalidQueryError(
                 f"XLSX report supports at most {_EXCEL_MAX_ROWS} rows; export CSV instead"
+            )
+        if table.column_count() > _EXCEL_MAX_COLS:
+            raise InvalidQueryError(
+                f"XLSX report supports at most {_EXCEL_MAX_COLS} columns; export CSV instead"
             )
         overview = pd.DataFrame(
             {
