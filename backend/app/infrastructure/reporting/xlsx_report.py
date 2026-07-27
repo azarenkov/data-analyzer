@@ -4,12 +4,17 @@ import pandas as pd
 
 from app.domain.dataset.entity import Dataset
 from app.domain.dataset.results import Insight
-from app.infrastructure.dataframe.pandas_table import safe_excel_writer
+from app.domain.dataset.errors import InvalidQueryError
+from app.infrastructure.dataframe.pandas_table import _EXCEL_MAX_ROWS, safe_excel_writer
 
 
 class XlsxReportBuilder:
     def build(self, dataset: Dataset, insights: list[Insight]) -> bytes:
         table = dataset.table
+        if table.row_count() > _EXCEL_MAX_ROWS:
+            raise InvalidQueryError(
+                f"XLSX report supports at most {_EXCEL_MAX_ROWS} rows; export CSV instead"
+            )
         overview = pd.DataFrame(
             {
                 "Параметр": ["Файл", "Загружен", "Строк", "Колонок"],

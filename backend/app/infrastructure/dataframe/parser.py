@@ -1,3 +1,4 @@
+import csv
 import io
 
 import pandas as pd
@@ -19,12 +20,21 @@ class PandasDatasetParser:
 
     def _read(self, extension: str, filename: str, content: bytes) -> pd.DataFrame:
         if extension == "csv":
-            return pd.read_csv(io.StringIO(self._decode(content)), sep=None, engine="python")
+            text = self._decode(content)
+            return pd.read_csv(io.StringIO(text), sep=self._detect_delimiter(text))
         if extension in ("xlsx", "xls"):
             return pd.read_excel(io.BytesIO(content))
         if extension == "json":
             return pd.read_json(io.BytesIO(content))
         raise UnsupportedFileError(filename)
+
+    @staticmethod
+    def _detect_delimiter(text: str) -> str:
+        sample = text[:8192]
+        try:
+            return csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+        except csv.Error:
+            return ","
 
     @staticmethod
     def _decode(content: bytes) -> str:

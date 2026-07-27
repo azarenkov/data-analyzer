@@ -52,13 +52,16 @@ export function DataTab({ datasetId, columns }: { datasetId: string; columns: Co
   }, [query.data, pageSize]);
 
   const addFilter = () => {
-    if (!draftColumn || draftValue.trim() === "") return;
+    const raw = draftKind === "boolean" && draftValue === "" ? "true" : draftValue;
+    if (!draftColumn || raw.trim() === "") return;
     const value =
       effectiveOperator === "in"
-        ? draftValue.split(",").map((part) => part.trim()).filter(Boolean)
+        ? raw.split(",").map((part) => part.trim()).filter(Boolean)
         : draftKind === "numeric"
-          ? Number(draftValue)
-          : draftValue.trim();
+          ? Number(raw)
+          : draftKind === "boolean"
+            ? raw === "true"
+            : raw.trim();
     if (draftKind === "numeric" && effectiveOperator !== "in" && Number.isNaN(value)) return;
     setFilters((current) => [
       ...current,
@@ -99,21 +102,33 @@ export function DataTab({ datasetId, columns }: { datasetId: string; columns: Co
             options={operators.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
             onChange={(v) => setDraftOperator(v as FilterOperator)}
           />
-          <label className="field filter-value">
-            <span className="field-label">
-              {effectiveOperator === "in" ? "Значения через запятую" : "Значение"}
-            </span>
-            <input
-              className="field-input"
-              type={draftKind === "numeric" ? "number" : draftKind === "datetime" ? "date" : "text"}
-              value={draftValue}
-              placeholder={effectiveOperator === "in" ? "UAE, UK, USA" : "…"}
-              onChange={(e) => setDraftValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addFilter();
-              }}
+          {draftKind === "boolean" ? (
+            <Select
+              label="Значение"
+              value={draftValue === "" ? "true" : draftValue}
+              options={[
+                { value: "true", label: "да" },
+                { value: "false", label: "нет" },
+              ]}
+              onChange={setDraftValue}
             />
-          </label>
+          ) : (
+            <label className="field filter-value">
+              <span className="field-label">
+                {effectiveOperator === "in" ? "Значения через запятую" : "Значение"}
+              </span>
+              <input
+                className="field-input"
+                type={draftKind === "numeric" ? "number" : draftKind === "datetime" ? "date" : "text"}
+                value={draftValue}
+                placeholder={effectiveOperator === "in" ? "UAE, UK, USA" : "…"}
+                onChange={(e) => setDraftValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addFilter();
+                }}
+              />
+            </label>
+          )}
           <button className="btn" onClick={addFilter}>
             Добавить фильтр
           </button>

@@ -1,5 +1,6 @@
 import io
 
+import numpy as np
 import pandas as pd
 
 from app.domain.dataset.errors import ColumnNotFoundError, InvalidQueryError
@@ -38,6 +39,8 @@ _AGG_MAP = {
 }
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+_EXCEL_MAX_ROWS = 1_048_575
 
 
 def safe_excel_writer(buffer: io.BytesIO) -> pd.ExcelWriter:
@@ -294,10 +297,23 @@ class PandasDataTable:
         df = self._apply_sort(self._apply_filters(self._df, filters), sort)
         if fmt == ExportFormat.CSV:
             return self._escape_csv_formulas(df).to_csv(index=False).encode("utf-8-sig")
+        if len(df) > _EXCEL_MAX_ROWS:
+            raise InvalidQueryError(
+                f"XLSX supports at most {_EXCEL_MAX_ROWS} rows; export CSV instead"
+            )
         buffer = io.BytesIO()
         with safe_excel_writer(buffer) as writer:
-            df.to_excel(writer, index=False, sheet_name="Data")
+            self._excel_safe(df).to_excel(writer, index=False, sheet_name="Data")
         return buffer.getvalue()
+
+    @staticmethod
+    def _excel_safe(df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        for column in out.columns:
+            series = out[column]
+            if isinstance(series.dtype, pd.DatetimeTZDtype):
+                out[column] = series.dt.tz_convert("UTC").dt.tz_localize(None)
+        return out
 
     @staticmethod
     def _escape_csv_formulas(df: pd.DataFrame) -> pd.DataFrame:
@@ -354,6 +370,15 @@ class PandasDataTable:
     @staticmethod
     def _coerce(series: pd.Series, value: object) -> object:
         try:
+            if pd.api.types.is_bool_dtype(series):
+                if isinstance(value, bool):
+                    return value
+                text = str(value).strip().lower()
+                if text in ("true", "1", "да", "yes"):
+                    return True
+                if text in ("false", "0", "нет", "no"):
+                    return False
+                raise InvalidQueryError(f"Invalid boolean filter value '{value}'")
             if pd.api.types.is_numeric_dtype(series):
                 return float(value)
             if pd.api.types.is_datetime64_any_dtype(series):
@@ -381,6 +406,10 @@ class PandasDataTable:
                 date_only = non_null.empty or (non_null.dt.time == pd.Timestamp(0).time()).all()
                 fmt = "%Y-%m-%d" if date_only else "%Y-%m-%d %H:%M:%S"
                 converted[column] = series.dt.strftime(fmt)
+        for column in converted.columns:
+            series = converted[column]
+            if pd.api.types.is_float_dtype(series):
+                converted[column] = series.mask(~np.isfinite(series))
         converted = converted.astype(object).where(pd.notna(converted), None)
         return converted.to_dict(orient="records")
 
