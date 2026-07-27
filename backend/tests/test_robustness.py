@@ -480,3 +480,15 @@ def test_utf16_csv_upload(client):
     assert meta["rowCount"] == 2
     page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
     assert {row["city"] for row in page["rows"]} == {"Астана", "Алматы"}
+
+
+def test_csv_export_deduplicates_escaped_headers(client):
+    meta = _upload_csv(client, b"=amount,'=amount\n1,2\n")
+    response = client.post(
+        f"/api/datasets/{meta['id']}/export",
+        json={"format": "csv"},
+    )
+    assert response.status_code == 200
+    header = response.content.decode("utf-8-sig").splitlines()[0]
+    assert "'=amount" in header
+    assert "'=amount_2" in header
