@@ -354,3 +354,27 @@ def test_report_keeps_dates_typed(client):
     assert response.status_code == 200
     frame = pd.read_excel(io.BytesIO(response.content), sheet_name="Данные")
     assert frame["day"].dtype.kind == "M"
+
+
+def test_correlation_columns_are_capped():
+    frame = pd.DataFrame({f"c{i}": range(10) for i in range(60)})
+    table = PandasDataTable(frame)
+    pairs = table.correlation_pairs(limit=1000)
+    involved = {p.left for p in pairs} | {p.right for p in pairs}
+    assert involved <= {f"c{i}" for i in range(40)}
+
+
+def test_count_analytics_without_numeric_columns(client):
+    meta = _upload_csv(client, b"day,city\n2025-01-01,Astana\n2025-01-02,Almaty\n2025-01-08,Astana\n")
+    groups = client.get(
+        f"/api/datasets/{meta['id']}/group-by",
+        params={"by": "city", "aggregation": "count"},
+    )
+    assert groups.status_code == 200
+    assert sum(g["count"] for g in groups.json()) == 3
+    series = client.get(
+        f"/api/datasets/{meta['id']}/time-series",
+        params={"dateColumn": "day", "aggregation": "count", "frequency": "week"},
+    )
+    assert series.status_code == 200
+    assert sum(p["value"] for p in series.json()) == 3.0

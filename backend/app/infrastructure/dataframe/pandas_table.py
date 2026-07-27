@@ -54,6 +54,8 @@ _EXCEL_MAX_ROWS = 1_048_575
 
 _EXCEL_MAX_COLS = 16_384
 
+_CORR_MAX_COLS = 40
+
 
 def excel_safe_frame(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
@@ -345,6 +347,7 @@ class PandasDataTable:
         numeric = self._df.select_dtypes(include="number")
         if len(numeric.columns) < 2:
             return []
+        numeric = numeric.iloc[:, :_CORR_MAX_COLS]
         matrix = numeric.replace([np.inf, -np.inf], np.nan).corr()
         pairs = []
         cols = list(matrix.columns)

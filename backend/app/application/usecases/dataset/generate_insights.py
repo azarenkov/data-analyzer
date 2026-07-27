@@ -18,9 +18,17 @@ def _fmt_num(value: float) -> str:
 
 
 class GenerateInsights:
-    def __init__(self, repository: DatasetRepository, max_insights: int = 8) -> None:
+    def __init__(
+        self,
+        repository: DatasetRepository,
+        max_insights: int = 8,
+        max_metrics: int = 8,
+        max_categories: int = 5,
+    ) -> None:
         self._repository = repository
         self._max_insights = max_insights
+        self._max_metrics = max_metrics
+        self._max_categories = max_categories
 
     def execute(self, dataset_id: str) -> list[Insight]:
         dataset = self._repository.get(dataset_id)
@@ -28,12 +36,12 @@ class GenerateInsights:
         columns = table.columns()
 
         date_column = next((c.name for c in columns if c.kind == ColumnKind.DATETIME), None)
-        metrics = [c.name for c in columns if c.kind == ColumnKind.NUMERIC]
+        metrics = [c.name for c in columns if c.kind == ColumnKind.NUMERIC][: self._max_metrics]
         categories = [
             c.name
             for c in columns
             if c.kind == ColumnKind.CATEGORICAL and 1 < c.unique <= 25
-        ]
+        ][: self._max_categories]
 
         insights: list[Insight] = []
         if date_column:

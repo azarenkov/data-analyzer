@@ -18,7 +18,10 @@ export function AnalyticsTab({ datasetId, columns }: { datasetId: string; column
     [columns],
   );
   const categoryColumns = useMemo(
-    () => columns.filter((c) => c.kind === "categorical").map((c) => c.name),
+    () =>
+      columns
+        .filter((c) => c.kind === "categorical" || c.kind === "boolean")
+        .map((c) => c.name),
     [columns],
   );
   const dateColumns = useMemo(
@@ -26,13 +29,15 @@ export function AnalyticsTab({ datasetId, columns }: { datasetId: string; column
     [columns],
   );
 
+  const hasMetrics = numericColumns.length > 0;
+
   const [metric, setMetric] = useState(numericColumns[0] ?? "");
   const [topAscending, setTopAscending] = useState(false);
   const [groupCol, setGroupCol] = useState(categoryColumns[0] ?? "");
-  const [groupAgg, setGroupAgg] = useState<Aggregation>("sum");
+  const [groupAgg, setGroupAgg] = useState<Aggregation>(hasMetrics ? "sum" : "count");
   const [dateColumn, setDateColumn] = useState(dateColumns[0] ?? "");
   const [frequency, setFrequency] = useState<TimeFrequency>("week");
-  const [timeAgg, setTimeAgg] = useState<Aggregation>("sum");
+  const [timeAgg, setTimeAgg] = useState<Aggregation>(hasMetrics ? "sum" : "count");
 
   const summary = useQuery({
     queryKey: ["summary", datasetId],
@@ -68,19 +73,32 @@ export function AnalyticsTab({ datasetId, columns }: { datasetId: string; column
     placeholderData: keepPreviousData,
   });
 
-  if (numericColumns.length === 0) {
-    return <p className="error-note">В файле нет числовых колонок — аналитика недоступна.</p>;
+  if (numericColumns.length === 0 && categoryColumns.length === 0 && dateColumns.length === 0) {
+    return (
+      <p className="error-note">
+        В файле нет числовых, категориальных или датированных колонок — аналитика недоступна.
+      </p>
+    );
   }
 
   const metricOptions = numericColumns.map((name) => ({ value: name, label: name }));
-  const aggOptions = AGGREGATIONS.map((a) => ({ value: a, label: AGG_LABELS[a] }));
+  const availableAggs = hasMetrics ? AGGREGATIONS : (["count"] as Aggregation[]);
+  const aggOptions = availableAggs.map((a) => ({ value: a, label: AGG_LABELS[a] }));
 
   return (
     <div className="tab-stack">
-      <div className="metric-bar">
-        <Select label="Метрика для анализа" value={metric} options={metricOptions} onChange={setMetric} />
-      </div>
+      {hasMetrics && (
+        <div className="metric-bar">
+          <Select
+            label="Метрика для анализа"
+            value={metric}
+            options={metricOptions}
+            onChange={setMetric}
+          />
+        </div>
+      )}
 
+      {hasMetrics && (
       <Panel title="Summary statistics" subtitle="Описательная статистика по числовым колонкам">
         {summary.data && (
           <div className="table-scroll">
@@ -117,7 +135,9 @@ export function AnalyticsTab({ datasetId, columns }: { datasetId: string; column
           </div>
         )}
       </Panel>
+      )}
 
+      {hasMetrics && (
       <Panel
         title={topAscending ? `Худшие записи по ${metric}` : `Лучшие записи по ${metric}`}
         subtitle="Десять строк с крайними значениями выбранной метрики"
@@ -140,6 +160,7 @@ export function AnalyticsTab({ datasetId, columns }: { datasetId: string; column
       >
         <DataGrid columns={columns.map((c) => c.name)} rows={top.data?.rows ?? []} />
       </Panel>
+      )}
 
       {categoryColumns.length > 0 && (
         <Panel
