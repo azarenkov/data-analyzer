@@ -28,6 +28,11 @@ class InvalidQueryError(DomainError):
     pass
 
 
+class FileTooLargeError(DomainError):
+    def __init__(self, limit_bytes: int) -> None:
+        super().__init__(f"File exceeds the upload limit of {limit_bytes // (1024 * 1024)} MB")
+
+
 class EmptyDatasetError(DomainError):
     def __init__(self) -> None:
         super().__init__("Dataset contains no rows")

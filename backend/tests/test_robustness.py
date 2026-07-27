@@ -82,3 +82,34 @@ def test_summary_with_infinite_values(client):
     ratio = next(s for s in response.json() if s["column"] == "ratio")
     assert ratio["maximum"] is None
     assert ratio["minimum"] is None
+
+
+def test_top_excludes_non_finite_values(client):
+    meta = _upload_csv(client, b"name,ratio\nalpha,inf\nbeta,2.5\ngamma,-inf\ndelta,7.1\n")
+    top = client.get(
+        f"/api/datasets/{meta['id']}/top",
+        params={"metric": "ratio", "limit": 2},
+    )
+    assert top.status_code == 200
+    assert [row["name"] for row in top.json()["rows"]] == ["delta", "beta"]
+
+
+def test_group_by_skips_infinite_aggregates(client):
+    meta = _upload_csv(client, b"grp,ratio\na,inf\na,1.0\nb,2.0\nb,3.0\n")
+    response = client.get(
+        f"/api/datasets/{meta['id']}/group-by",
+        params={"by": "grp", "metric": "ratio", "aggregation": "max"},
+    )
+    assert response.status_code == 200
+    assert [g["label"] for g in response.json()] == ["b"]
+
+
+def test_upload_size_limit(client, monkeypatch):
+    from app.presentation import routes
+
+    monkeypatch.setattr(routes, "MAX_UPLOAD_BYTES", 64)
+    response = client.post(
+        "/api/datasets",
+        files={"file": ("big.csv", b"a,b\n" + b"1,2\n" * 100, "text/csv")},
+    )
+    assert response.status_code == 413

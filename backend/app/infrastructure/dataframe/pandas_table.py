@@ -167,7 +167,8 @@ class PandasDataTable:
         filters: list[FilterSpec],
     ) -> TablePage:
         self._require_numeric(metric)
-        df = self._apply_filters(self._df, filters).dropna(subset=[metric])
+        df = self._apply_filters(self._df, filters)
+        df = df[np.isfinite(df[metric])]
         df = df.sort_values(metric, ascending=ascending).head(limit)
         return TablePage(rows=self._records(df), total=int(len(df)), page=1, page_size=limit)
 
@@ -189,7 +190,7 @@ class PandasDataTable:
             values = grouped[metric].agg(_AGG_MAP[aggregation])
         result = []
         for label, value in values.items():
-            if pd.isna(value):
+            if pd.isna(value) or not math.isfinite(float(value)):
                 continue
             result.append(
                 GroupRow(
@@ -219,7 +220,7 @@ class PandasDataTable:
             values = df.groupby(grouper)[metric].agg(_AGG_MAP[aggregation])
         result = []
         for period, value in values.items():
-            if pd.isna(value):
+            if pd.isna(value) or not math.isfinite(float(value)):
                 continue
             result.append(TimePoint(period=self._period_label(period, frequency), value=float(value)))
         return result
@@ -266,6 +267,8 @@ class PandasDataTable:
     ) -> list[SegmentChange]:
         first_mean = float(first[metric].mean())
         second_mean = float(second[metric].mean())
+        if not (math.isfinite(first_mean) and math.isfinite(second_mean)):
+            return []
         change = (
             (second_mean - first_mean) / abs(first_mean) * 100 if first_mean != 0 else None
         )

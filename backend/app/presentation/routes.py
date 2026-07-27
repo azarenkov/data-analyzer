@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.domain.dataset.entity import Dataset
+from app.domain.dataset.errors import FileTooLargeError
 from app.domain.dataset.values import Aggregation, ExportFormat, FilterSpec, SortSpec, TimeFrequency
 from app.presentation.container import Container, get_container
 from app.presentation.schemas import (
@@ -23,6 +24,9 @@ from app.presentation.schemas import (
 )
 
 router = APIRouter(prefix="/api/datasets", tags=["datasets"])
+
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+_READ_CHUNK = 1024 * 1024
 
 ContainerDep = Annotated[Container, Depends(get_container)]
 
@@ -62,8 +66,12 @@ def _file_response(content: bytes, filename: str, media_type: str) -> StreamingR
 
 @router.post("", response_model=DatasetMetaSchema)
 async def upload_dataset(file: UploadFile, container: ContainerDep) -> DatasetMetaSchema:
-    content = await file.read()
-    dataset = container.upload_dataset.execute(file.filename or "dataset", content)
+    content = bytearray()
+    while chunk := await file.read(_READ_CHUNK):
+        content.extend(chunk)
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise FileTooLargeError(MAX_UPLOAD_BYTES)
+    dataset = container.upload_dataset.execute(file.filename or "dataset", bytes(content))
     return _meta(dataset)
 
 
