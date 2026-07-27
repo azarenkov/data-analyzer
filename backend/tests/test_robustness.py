@@ -334,3 +334,13 @@ def test_whitespace_only_header_gets_generated_name(client):
     )
     assert page.status_code == 200
     assert len(page.json()["rows"]) == 1
+
+
+def test_na_like_strings_are_preserved(client):
+    meta = _upload_csv(client, b"code,value\nNA,1\nN/A,2\nNULL,3\n,4\n")
+    overview = client.get(f"/api/datasets/{meta['id']}").json()
+    missing = {c["name"]: c["missing"] for c in overview["columns"]}
+    assert missing["code"] == 1
+    page = client.post(f"/api/datasets/{meta['id']}/query", json={}).json()
+    codes = [row["code"] for row in page["rows"]]
+    assert codes == ["NA", "N/A", "NULL", None]

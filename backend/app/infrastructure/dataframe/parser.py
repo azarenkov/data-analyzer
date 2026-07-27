@@ -21,9 +21,14 @@ class PandasDatasetParser:
     def _read(self, extension: str, filename: str, content: bytes) -> pd.DataFrame:
         if extension == "csv":
             text = self._decode(content)
-            return pd.read_csv(io.StringIO(text), sep=self._detect_delimiter(text))
+            return pd.read_csv(
+                io.StringIO(text),
+                sep=self._detect_delimiter(text),
+                keep_default_na=False,
+                na_values=[""],
+            )
         if extension in ("xlsx", "xls"):
-            return pd.read_excel(io.BytesIO(content))
+            return pd.read_excel(io.BytesIO(content), keep_default_na=False, na_values=[""])
         if extension == "json":
             return pd.read_json(io.BytesIO(content))
         raise UnsupportedFileError(filename)
